@@ -1,6 +1,8 @@
-import type {Axios} from 'axios';
+import {Axios, AxiosError, AxiosResponse} from 'axios';
 const axios: Axios = require('axios');
 import cheerio from 'cheerio';
+
+const RATE_LIMIT_WAIT = 61000; // ms
 
 interface Dependent {
   repo: string;
@@ -13,25 +15,39 @@ interface ScrapeResult {
   nextURL: string | null;
 }
 
-export async function getDependents(repo: string, pageLimit = 500) {
+export async function getDependents(repo: string, pageLimit = 300) {
   const baseURL = `https://github.com/${repo}/network/dependents`;
 
   const dependents: Dependent[] = [];
   let nextURL: string | null = baseURL;
+  let currentPage = 0;
 
   do {
-    pageLimit--;
+    console.log(`Page ${currentPage}`);
     const res: ScrapeResult = await scrapePage(nextURL);
     dependents.push(...res.dependents);
     nextURL = res.nextURL;
-  } while (pageLimit > 0 && nextURL);
+    if (res.dependents.length > 0) currentPage++;
+  } while (currentPage < pageLimit && nextURL);
 
-  console.log(dependents);
-  console.log(`${dependents.length} deps found`);
+  return dependents;
 }
 
 async function scrapePage(url: string): Promise<ScrapeResult> {
-  const res = await axios.get(url);
+  let res: AxiosResponse;
+
+  try {
+    res = await axios.get(url);
+  } catch (e: unknown) {
+    if (e instanceof AxiosError && e.code === 'ERR_BAD_REQUEST') {
+      console.log(`Waiting ${RATE_LIMIT_WAIT / 1000}s...`);
+      await new Promise(r => setTimeout(r, RATE_LIMIT_WAIT));
+      return {
+        dependents: [],
+        nextURL: url,
+      };
+    } else throw e;
+  }
 
   const $ = cheerio.load(res.data);
 
