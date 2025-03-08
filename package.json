@@ -30,7 +30,7 @@
   },
   "homepage": "https://github.com/EndBug/github-dependents-scraper#readme",
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.8.2",
     "cheerio": "^1.0.0-rc.12"
   },
   "devDependencies": {
